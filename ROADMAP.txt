@@ -1,0 +1,278 @@
+================================================================================
+CAREER-OPS WEB — PORTING ROADMAP
+Features to bring over from the CLI (../career-ops/) to this Next.js web app.
+Grouped by round. Each round stands alone — ship only what you want.
+Created: 2026-04-18
+================================================================================
+
+
+ROUND 1 — CLOSE THE DAILY-USE LOOP (~1 weekend, ~16h)
+--------------------------------------------------------------------------------
+Features you hit every day that are still missing. Highest leverage.
+
+
+1.1  /pipeline — Inbox of pending URLs
+    What:        Page showing URLs you've saved but haven't evaluated yet
+    CLI source:  data/pipeline.md
+    Schema:      users/{uid}/pipeline/{id}
+                 { url, source, title?, addedAt, status: pending|evaluated|skipped }
+    UI:          Table with "Evaluate now" button per row
+                 → triggers chat fetch_jd → evaluate_job
+    New tool:    add_to_pipeline — AI calls when user pastes URL but says "later"
+    Effort:      S (~3h)
+
+
+1.2  /compare — Side-by-side offer comparison
+    What:        Pick 2-4 evaluations from tracker → scored comparison
+    CLI source:  modes/ofertas.md
+    Route:       /compare?ids=abc,def,ghi
+    UI:          3-column grid — overall score, per-block A-F, pros/cons, recommendation
+    New tool:    compare_offers — Claude generates recommendation narrative
+    Effort:      M (~5h)
+
+
+1.3  Follow-up cadence + reminders
+    What:        Auto-remind after N days on "Applied" status
+    CLI source:  followup-cadence.mjs, data/follow-ups.md
+    Schema:      users/{uid}/applications/{id}.followUps: [{ dueAt, reason, done }]
+    UI:          Badge on tracker rows ("Due: 3 days overdue")
+                 /tracker?filter=due view
+    Cron:        Daily Vercel Cron scans for due reminders, optionally emails
+    Effort:      M (~5h)
+
+
+1.4  Liveness checker
+    What:        Is this JD still open? Re-checks tracker rows periodically
+    CLI source:  check-liveness.mjs, liveness-core.mjs
+    Logic:       Re-fetch JD URL → check for closed/expired text patterns
+    UI:          Live / Closed indicator on tracker rows
+    Cron:        Nightly on all non-terminal applications
+    Effort:      S (~3h)
+
+
+================================================================================
+ROUND 2 — AUTOMATE DISCOVERY (~1 weekend, ~16h)
+================================================================================
+
+
+2.1  Portal scanning (Greenhouse / Ashby / Lever)
+    What:        Auto-discover new jobs from ~45 companies
+    CLI source:  scan.mjs, portals.yml
+    Implementation:
+                 - Vercel Cron runs /api/scan daily
+                 - For each user-configured company, hit the ATS JSON API
+                 - Filter by title_filter.positive / negative
+                 - Dedupe against pipeline + tracker
+                 - Insert new hits into users/{uid}/pipeline
+    User config: users/{uid}/portals/{id}
+                 — company slug, ATS type, keyword filters
+    UI:          /portals page to manage companies
+    Effort:      L (~8h)
+
+
+2.2  Batch evaluation
+    What:        Upload 10+ JDs, evaluate in parallel
+    CLI source:  batch-runner.sh, batch/batch-prompt.md
+    Web:         Drag multiple PDFs OR paste URL list
+                 → background job evaluates all
+    Queue:       Inngest or Trigger.dev (durable background jobs)
+    UI:          /batch page with progress ("4 of 12 done...")
+    Effort:      L (~8h)
+
+
+================================================================================
+ROUND 3 — META-INSIGHTS (~1 weekend, ~10h)
+================================================================================
+
+
+3.1  /insights — Pattern analysis
+    What:        "You score 4+ on AI startups but never get past screen —
+                  pattern: no Python"
+    CLI source:  analyze-patterns.mjs
+    Logic:       Aggregate over all reports — by status, company type, score
+                 → find correlations
+    UI:          Charts (recharts): applications/week, response rate by score
+                 band, top rejection reasons (from notes)
+    AI summary:  Claude reads aggregates and writes 3-5 actionable insights
+    Effort:      M (~5h)
+
+
+3.2  /interview-prep — STAR story aggregator
+    What:        All STAR stories from every evaluation, searchable
+    CLI source:  interview-prep/story-bank.md
+    UI:          Searchable list of every STAR+R story across all reports
+    Filter:      By skill / competency / project
+    Effort:      M (~5h)
+
+
+================================================================================
+ROUND 4 — ACTIVE APPLICATION (~1 weekend, ~7h)
+================================================================================
+
+
+4.1  Apply assistant
+    What:        Help user fill application forms (draft answers, not auto-submit)
+    CLI source:  modes/apply.md
+    Implementation (no browser extension yet):
+                 - New chat tool: draft_application_answer
+                 - Input: question like "Why this role?"
+                 - Output: tailored draft based on CV + JD + evaluation
+                 - User copies the answer into the form
+    Alternative: Browser extension that auto-fills Greenhouse/Lever forms
+                 (large scope — later)
+    Effort:      S for chat tool (~3h)   |   XL for extension
+
+
+4.2  Training / Project evaluators
+    What:        "Should I take this course?" / "Should I build this project?"
+    CLI source:  modes/training.md, modes/project.md
+    Web:         Two new chat tools — evaluate_training, evaluate_project
+                 Same A-G scoring, adapted prompts
+    UI:          No new pages — just chat
+    Effort:      S each (~2h each)
+
+
+================================================================================
+ROUND 5 — POLISH + INTERNATIONAL (~1 weekend, ~15h)
+================================================================================
+
+
+5.1  LinkedIn contact finder
+    What:        Given a company, find recruiters/managers, draft outreach
+    CLI source:  modes/contacto.md
+    Web:         New tool — find_linkedin_contact
+    Challenge:   LinkedIn blocks scraping
+    Realistic:   - Use Perplexity/web search for public names
+                   ("<Company> engineering hiring manager LinkedIn")
+                 - User copies names manually; AI drafts outreach
+    Note:        Not automatable end-to-end legally — accept partial
+    Effort:      M (~5h)
+
+
+5.2  Multi-language modes (DE / FR / JA)
+    What:        German, French, Japanese evaluation modes
+    CLI source:  modes/de/, modes/fr/, modes/ja/
+    Web:         Add language: "en" | "de" | "fr" | "ja" to user profile
+                 Switch system prompt based on language setting
+    UI:          Language dropdown in Profile
+    Effort:      M (~5h) — mostly prompt porting
+
+
+5.3  Canva-style visual CV export (optional)
+    What:        Fancy designed CV (not just ATS-clean)
+    CLI source:  Canva MCP integration hint in modes/pdf.md
+    Web:         Keep react-pdf for ATS
+                 Add a second template for "visual"
+    Effort:      M (~5h)
+
+
+================================================================================
+INFRA / OPERATIONAL (ongoing, any order)
+================================================================================
+
+
+6.1  Per-user token budget + rate limit
+     - Upstash Ratelimit on /api/chat, /api/parse-resume
+     - Track monthly tokens per user → hard cap
+     - Needed before letting strangers use this
+
+
+6.2  Error monitoring + analytics
+     - Sentry (10 min) for errors
+     - Plausible / PostHog for usage
+
+
+6.3  Firebase Storage for PDFs
+     - Currently PDFs return as base64 — they vanish after download
+     - Upload to Storage → persistent URL in report doc
+     - Re-download from /reports/[id]
+
+
+6.4  Tests
+     - Unit: schemas, fetch-jd, parse-resume prompts
+     - E2E: sign in → evaluate → save flow (Playwright)
+
+
+================================================================================
+SUGGESTED SHIPPING ORDER
+================================================================================
+
+
+Round 1 ──► Round 3 ──► Round 2 ──► Round 4 ──► Round 5
+ (daily)     (insights)   (scale)    (application)  (edge)
+
+In parallel: Infra (6.1-6.4) as needed
+
+
+Why this order:
+  - R1 delivers the most daily value
+  - R3 lets you pitch "insights" feature early (great for portfolio/marketing)
+  - R2 needs infra investment; do after you know what you're building
+  - R4 is valuable but less frequent
+  - R5 is edge / international — last
+
+
+================================================================================
+TOTAL EFFORT TO FULL PARITY
+================================================================================
+
+
+  Round 1:          ~16h      (2 weekends)
+  Round 2:          ~16h      (2 weekends)
+  Round 3:          ~10h      (1 weekend)
+  Round 4:           ~7h      (1 weekend)
+  Round 5:          ~15h      (2 weekends)
+  Infra (spread):   ~10h
+  ──────────────────────────────────────────
+  Total:            ~74h      (~1 month of focused weekends)
+
+
+At full parity the web app is STRICTLY BETTER than the CLI:
+  everything the CLI has + multi-user + mobile + persistence + realtime.
+
+
+================================================================================
+RECOMMENDED STARTING POINT
+================================================================================
+
+
+  Start with Round 1, features 1.1 + 1.2 (pipeline + compare).
+  Those give the most "oh wow, it's a real product" moments with the least work.
+
+
+================================================================================
+CURRENT FEATURE MATRIX (SNAPSHOT)
+================================================================================
+
+Legend:  [X] Done    [ ] Missing    [~] Partial
+
+                                        CLI         WEB
+  Evaluate JD (A-G scoring)             [X]         [X]
+  Tailor CV PDF                         [X]         [X]
+  Cover letter                          [ ]         [X]  ← web wins
+  Company deep research                 [X]         [X]  ← web: Perplexity
+  Applications tracker                  [X]         [X]  ← web: realtime
+  Single-URL evaluate                   [X]         [X]
+  Chat-first UX                         [X]         [X]
+  Sign in / multi-user                  [ ]         [X]  ← web wins
+  Resume upload parse                   [ ]         [X]  ← web wins
+  Report viewer                         [~]         [X]  ← /reports/[id]
+  Admin metrics                         [ ]         [X]  ← web-only
+  Mobile                                [ ]         [X]  ← web wins
+  Portal scanning                       [X]         [ ]  ← ROUND 2.1
+  Pipeline inbox                        [X]         [ ]  ← ROUND 1.1
+  Batch processing                      [X]         [ ]  ← ROUND 2.2
+  Compare offers                        [X]         [ ]  ← ROUND 1.2
+  LinkedIn contact finder               [X]         [ ]  ← ROUND 5.1
+  Training / project evaluator          [X]         [ ]  ← ROUND 4.2
+  Follow-up cadence                     [X]         [ ]  ← ROUND 1.3
+  Rejection pattern analysis            [X]         [ ]  ← ROUND 3.1
+  Interview-prep aggregator             [X]         [ ]  ← ROUND 3.2
+  Liveness checker                      [X]         [ ]  ← ROUND 1.4
+  Multi-language (DE / FR / JA)         [X]         [ ]  ← ROUND 5.2
+  Apply assistant                       [X]         [ ]  ← ROUND 4.1
+
+
+================================================================================
+END OF ROADMAP
+================================================================================
