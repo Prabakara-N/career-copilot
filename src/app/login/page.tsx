@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth-provider";
+import { GoogleIcon } from "@/components/ui/google-icon";
 
 function isSafeRedirect(path: string | null): string {
   if (!path) return "/chat";
@@ -53,7 +54,13 @@ function LoginInner() {
               : "Use Google to sign in. We never store passwords — Firebase handles auth."}
           </CardDescription>
         </CardHeader>
-        <Button onClick={handleSignIn} disabled={busy} className="w-full px-5">
+        <Button
+          onClick={handleSignIn}
+          disabled={busy}
+          variant="outline"
+          className="w-full gap-2 bg-white text-slate-900 hover:bg-slate-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+        >
+          <GoogleIcon className="size-4" />
           {busy ? "Signing in…" : "Continue with Google"}
         </Button>
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
